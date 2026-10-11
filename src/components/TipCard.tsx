@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -8,7 +9,6 @@ import {
   ExternalLink,
   CheckCircle,
   AlertCircle,
-  Zap,
   Info,
 } from "lucide-react";
 import confetti from "canvas-confetti";
@@ -45,9 +45,7 @@ export const TipCard: React.FC<TipCardProps> = ({
   } | null>(null);
 
   useEffect(() => {
-    if (initialRecipient) {
-      setRecipient(initialRecipient);
-    }
+    if (initialRecipient) setRecipient(initialRecipient);
   }, [initialRecipient]);
 
   const handlePreset = (val: string) => {
@@ -57,11 +55,11 @@ export const TipCard: React.FC<TipCardProps> = ({
 
   const handleMax = () => {
     if (!senderBalance || senderBalance <= 0n) return;
-    // Leave small dust for gas (< 0.002 USDC)
+
     const reserve = parseUsdc("0.002");
+
     if (senderBalance > reserve) {
-      const maxVal = senderBalance - reserve;
-      setAmount(formatUsdc(maxVal, 4).replace(/,/g, ""));
+      setAmount(formatUsdc(senderBalance - reserve, 4).replace(/,/g, ""));
     } else {
       setAmount("0.0");
     }
@@ -72,19 +70,21 @@ export const TipCard: React.FC<TipCardProps> = ({
     setStatusMessage(null);
 
     const cleanRecipient = recipient.trim();
-    if (!cleanRecipient.startsWith("0x") || cleanRecipient.length !== 42) {
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(cleanRecipient)) {
       setStatusMessage({
         type: "error",
-        text: "Please enter a valid Arc wallet address (0x...)",
+        text: "That payment address doesn't look right. Double-check it and try again.",
       });
       return;
     }
 
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
+    const numAmount = Number(amount);
+
+    if (!Number.isFinite(numAmount) || numAmount <= 0) {
       setStatusMessage({
         type: "error",
-        text: "Tip amount must be greater than 0 USDC",
+        text: "Enter an amount greater than $0.",
       });
       return;
     }
@@ -92,7 +92,7 @@ export const TipCard: React.FC<TipCardProps> = ({
     if (!senderAddress) {
       setStatusMessage({
         type: "error",
-        text: "Please connect your wallet first",
+        text: "Connect your account before sending a tip.",
       });
       return;
     }
@@ -100,21 +100,24 @@ export const TipCard: React.FC<TipCardProps> = ({
     setLoading(true);
     setStatusMessage({
       type: "info",
-      text: "Waiting for wallet confirmation on Arc Mainnet...",
+      text: "One sec! Confirm your tip in your wallet.",
     });
 
     try {
-      const res = await onSendTip(cleanRecipient, amount, memo, useContract);
+      const res = await onSendTip(
+        cleanRecipient,
+        amount,
+        memo,
+        useContract
+      );
+
       if (res.success && res.txHash) {
         setStatusMessage({
           type: "success",
-          text: `Tip confirmed on Arc Mainnet! Sent ${amount} USDC to ${formatAddress(
-            cleanRecipient
-          )}`,
+          text: `Tip sent! You sent $${amount} to ${formatAddress(cleanRecipient)}. Show that love! 💙`,
           txHash: res.txHash,
         });
 
-        // Trigger confetti effect
         try {
           confetti({
             particleCount: 80,
@@ -123,22 +126,20 @@ export const TipCard: React.FC<TipCardProps> = ({
             colors: ["#00D2FF", "#2775CA", "#10B981", "#ffffff"],
           });
         } catch {
-          // ignore
+          // Ignore animation errors.
         }
 
         setMemo("");
       } else {
         setStatusMessage({
           type: "error",
-          text: res.error || "Transaction was rejected or failed on-chain.",
+          text: "Your tip didn't go through. Check your balance and payment details, then try again.",
         });
       }
     } catch (err: unknown) {
-      const errMsg =
-        err instanceof Error ? err.message : "Unexpected transaction error";
       setStatusMessage({
         type: "error",
-        text: errMsg,
+        text: "Something went wrong. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -147,64 +148,63 @@ export const TipCard: React.FC<TipCardProps> = ({
 
   return (
     <div className="w-full bg-[#121722] border border-[#1E2638] rounded-xl p-5 sm:p-6 shadow-2xl relative overflow-hidden">
-      {/* Decorative hairline accent */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#00D2FF] to-transparent opacity-80" />
 
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-            Send Native USDC Tip
-            <span className="text-[10px] font-mono font-normal text-[#00D2FF] bg-[#0B0E14] border border-[#1E2638] px-2 py-0.5 rounded">
-              Zero Approval
-            </span>
+            Send a Tip 💸
           </h2>
-          <p className="text-xs text-[#94A3B8] mt-0.5">
-            1-step native transfer. Gas and settlement paid in USDC on Arc L1.
+          <p className="text-xs text-[#94A3B8] mt-1">
+            A little love goes a long way.
           </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Recipient Address */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-mono uppercase text-[#94A3B8] tracking-wider">
-              Recipient Address
+            <label className="text-xs font-medium text-[#94A3B8]">
+              Who are you tipping?
             </label>
             {initialRecipient && (
-              <span className="text-[11px] font-mono text-[#00D2FF]">
-                Prefilled via Link
+              <span className="text-[11px] text-[#00D2FF]">
+                Link opened ✓
               </span>
             )}
           </div>
+
           <input
             type="text"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
-            placeholder="0x..."
-            className="w-full bg-[#0B0E14] border border-[#1E2638] rounded-lg px-3.5 py-2.5 text-sm font-mono text-white placeholder-[#475569] focus:outline-none focus:border-[#00D2FF] transition-all"
+            placeholder="Enter payment address"
+            autoComplete="off"
+            className="w-full bg-[#0B0E14] border border-[#1E2638] rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-[#475569] focus:outline-none focus:border-[#00D2FF] transition-all"
             required
           />
         </div>
 
-        {/* Tip Amount & Presets */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-mono uppercase text-[#94A3B8] tracking-wider">
-              Tip Amount (USDC)
+            <label className="text-xs font-medium text-[#94A3B8]">
+              How much? 
             </label>
             {senderBalance !== null && (
               <button
                 type="button"
                 onClick={handleMax}
-                className="text-[11px] font-mono text-[#00D2FF] hover:underline"
+                className="text-[11px] text-[#00D2FF] hover:underline"
               >
-                Max: {formatUsdc(senderBalance)} USDC
+                Available: ${formatUsdc(senderBalance)}
               </button>
             )}
           </div>
 
           <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-bold text-[#00D2FF]">
+              $
+            </span>
             <input
               type="number"
               step="any"
@@ -212,95 +212,83 @@ export const TipCard: React.FC<TipCardProps> = ({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="1.00"
-              className="w-full bg-[#0B0E14] border border-[#1E2638] rounded-lg pl-3.5 pr-20 py-3 text-lg font-mono font-semibold text-white placeholder-[#475569] focus:outline-none focus:border-[#00D2FF] transition-all"
+              className="w-full bg-[#0B0E14] border border-[#1E2638] rounded-lg pl-8 pr-4 py-3 text-lg font-semibold text-white placeholder-[#475569] focus:outline-none focus:border-[#00D2FF] transition-all"
               required
             />
-            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
-              <span className="text-xs font-bold font-mono text-[#00D2FF]">
-                USDC
-              </span>
-            </div>
           </div>
 
-          {/* Preset Chips */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {PRESET_AMOUNTS.map((preset) => (
               <button
                 key={preset}
                 type="button"
                 onClick={() => handlePreset(preset)}
-                className={`text-xs font-mono px-3 py-1.5 rounded-lg border transition-all ${
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
                   amount === preset
                     ? "bg-[#00D2FF]/10 border-[#00D2FF] text-[#00D2FF] font-medium"
                     : "bg-[#0B0E14] border-[#1E2638] text-[#94A3B8] hover:text-white hover:border-[#334155]"
                 }`}
               >
-                ${preset}
+                ${Number(preset).toFixed(2)}
               </button>
             ))}
           </div>
         </div>
 
-        {/* On-Chain Memo */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-mono uppercase text-[#94A3B8] tracking-wider flex items-center gap-1.5">
-              <span>On-Chain Memo</span>
-              <span className="text-[10px] text-[#64748B] normal-case">(optional)</span>
+            <label className="text-xs font-medium text-[#94A3B8]">
+              Add a note
+              <span className="text-[#64748B] ml-1">(optional)</span>
             </label>
-            <span className="text-[10px] font-mono text-[#64748B]">
+            <span className="text-[10px] text-[#64748B]">
               {memo.length}/280
             </span>
           </div>
+
           <input
             type="text"
             maxLength={280}
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
-            placeholder="Great work on open source! 🚀"
-            className="w-full bg-[#0B0E14] border border-[#1E2638] rounded-lg px-3.5 py-2.5 text-xs text-white placeholder-[#475569] focus:outline-none focus:border-[#00D2FF] transition-all"
+            placeholder="You're amazing! Keep going 💙"
+            className="w-full bg-[#0B0E14] border border-[#1E2638] rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-[#475569] focus:outline-none focus:border-[#00D2FF] transition-all"
           />
         </div>
 
-        {/* Transfer Mode Toggle */}
-        <div className="pt-1">
-          <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#0B0E14] border border-[#1E2638]">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-[#00D2FF]" />
-              <div className="text-left">
-                <span className="text-xs font-medium text-white block">
-                  {useContract ? "ArcTipJar Contract Memo" : "Direct P2P Transfer"}
-                </span>
-                <span className="text-[10px] text-[#64748B] block font-mono">
-                  {useContract
-                    ? "Emits on-chain Tip event with public memo"
-                    : "Zero-contract native transfer (21k gas)"}
-                </span>
-              </div>
-            </div>
+        <details className="group pt-1">
+          <summary className="cursor-pointer text-xs text-[#64748B] hover:text-[#94A3B8]">
+            More payment options
+          </summary>
+          <div className="mt-2 p-3 rounded-lg bg-[#0B0E14] border border-[#1E2638]">
+            <p className="text-xs text-[#94A3B8] mb-2">
+              Choose how your tip is sent.
+            </p>
             <button
               type="button"
               onClick={() => setUseContract(!useContract)}
-              className="text-[11px] font-mono px-2.5 py-1 rounded bg-[#182030] text-[#00D2FF] border border-[#1E2638] hover:bg-[#1E2638] transition-colors"
+              className="text-xs text-[#00D2FF] hover:underline"
             >
-              Toggle
+              {useContract
+                ? "Use standard payment instead"
+                : "Include a public tip note"}
             </button>
           </div>
-        </div>
+        </details>
 
-        {/* Gas Insight Box */}
         <div className="p-3 rounded-lg bg-[#0B0E14]/60 border border-[#1E2638]/70 flex items-start gap-2.5 text-[11px] text-[#94A3B8]">
           <Info className="w-4 h-4 text-[#00D2FF] shrink-0 mt-0.5" />
-          <div>
-            <span className="text-white font-medium">Arc Native Advantage: </span>
-            No ERC-20 approve transaction needed. Gas fee (~0.0001 USDC) is deducted
-            directly from your USDC balance in the same single block transaction.
-          </div>
+          <p>
+            Check the recipient and amount before sending. Network
+            fees may apply. Notes sent with a public payment may be
+            visible to others.
+          </p>
         </div>
 
-        {/* Status Box */}
         {statusMessage && (
           <div
+            role="status"
+            aria-live="polite"
             className={`p-3 rounded-lg border text-xs flex items-start gap-2 ${
               statusMessage.type === "success"
                 ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
@@ -310,12 +298,13 @@ export const TipCard: React.FC<TipCardProps> = ({
             }`}
           >
             {statusMessage.type === "success" ? (
-              <CheckCircle className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+              <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
             ) : statusMessage.type === "error" ? (
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             ) : (
-              <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-[#00D2FF] animate-spin" />
+              <Sparkles className="w-4 h-4 shrink-0 mt-0.5 animate-spin" />
             )}
+
             <div className="space-y-1">
               <div>{statusMessage.text}</div>
               {statusMessage.txHash && (
@@ -323,9 +312,9 @@ export const TipCard: React.FC<TipCardProps> = ({
                   href={getTxUrl(statusMessage.txHash)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 font-mono text-[11px] text-white hover:underline pt-0.5"
+                  className="inline-flex items-center gap-1 text-[11px] text-white hover:underline pt-0.5"
                 >
-                  <span>View on Arc Explorer</span>
+                  <span>View payment details</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               )}
@@ -333,7 +322,6 @@ export const TipCard: React.FC<TipCardProps> = ({
           </div>
         )}
 
-        {/* Submit Button */}
         <button
           type="submit"
           disabled={loading}
@@ -346,14 +334,12 @@ export const TipCard: React.FC<TipCardProps> = ({
           {loading ? (
             <>
               <div className="w-4 h-4 border-2 border-[#94A3B8] border-t-transparent rounded-full animate-spin" />
-              <span>Broadcasting to Arc...</span>
+              <span>Sending your tip...</span>
             </>
           ) : (
             <>
               <Send className="w-4 h-4" />
-              <span>
-                Tip {amount} USDC {memo ? "with Memo" : ""}
-              </span>
+              <span>Send ${amount} {memo ? "💙" : "Tip 💸"}</span>
             </>
           )}
         </button>
