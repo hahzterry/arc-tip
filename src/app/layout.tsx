@@ -14,7 +14,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ArcTip — Native USDC Tipping & Micro-Payments on Arc Layer 1",
+  title: "MonYuny Tip - USDC Tipping & Micro-Payments on Arc Layer 1",
   description:
     "Non-custodial USDC tip jar and payment links on Circle's Arc Layer 1 (Chain ID 5042). Native USDC gas, zero approvals, sub-second settlement.",
   keywords: [
