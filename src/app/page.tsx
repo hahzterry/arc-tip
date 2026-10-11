@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -15,7 +16,7 @@ import {
   ArcNetworkStats,
   TipEvent,
 } from "@/lib/rpc";
-import { Zap, Shield, ExternalLink, Code2 } from "lucide-react";
+import { Zap } from "lucide-react";
 
 export default function Home() {
   const {
@@ -34,50 +35,51 @@ export default function Home() {
   const [tips, setTips] = useState<TipEvent[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(false);
 
-  // Modals
   const [networkModalOpen, setNetworkModalOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [qrData, setQrData] = useState<{ url: string; address: string }>({
+  const [qrData, setQrData] = useState({
     url: "",
     address: "",
   });
 
   const loadNetworkData = useCallback(async () => {
     setLoadingFeed(true);
+
     try {
       const [netStats, totalTips, recentTips] = await Promise.all([
         getArcNetworkStats(),
         getGlobalTotalTips(),
         getRecentTips(10),
       ]);
+
       setStats(netStats);
       setTotalTipsCount(totalTips);
 
-      // Merge with any local session tips stored in localStorage
       let localSessionTips: TipEvent[] = [];
+
       try {
         const stored = localStorage.getItem("arc_tip_local_history");
+
         if (stored) {
           localSessionTips = JSON.parse(stored);
         }
       } catch {
-        // ignore
+        // Ignore local history errors.
       }
 
-      // Deduplicate by txHash
       const seen = new Set<string>();
       const combined: TipEvent[] = [];
 
-      for (const t of [...localSessionTips, ...recentTips]) {
-        if (!seen.has(t.txHash.toLowerCase())) {
-          seen.add(t.txHash.toLowerCase());
-          combined.push(t);
+      for (const tip of [...localSessionTips, ...recentTips]) {
+        if (!seen.has(tip.txHash.toLowerCase())) {
+          seen.add(tip.txHash.toLowerCase());
+          combined.push(tip);
         }
       }
 
       setTips(combined.slice(0, 15));
     } catch (err) {
-      console.error("Error loading network data:", err);
+      console.error("Error loading activity:", err);
     } finally {
       setLoadingFeed(false);
     }
@@ -85,7 +87,9 @@ export default function Home() {
 
   useEffect(() => {
     loadNetworkData();
+
     const interval = setInterval(loadNetworkData, 15_000);
+
     return () => clearInterval(interval);
   }, [loadNetworkData]);
 
@@ -100,13 +104,20 @@ export default function Home() {
     memo: string,
     useContract: boolean
   ) => {
-    const res = await sendTip(recipient, amountUsdc, memo, useContract);
+    const res = await sendTip(
+      recipient,
+      amountUsdc,
+      memo,
+      useContract
+    );
+
     if (res.success && res.txHash && account) {
-      // Store in local history for immediate responsive feed feedback
       const newTip: TipEvent = {
         from: account,
         to: recipient,
-        amount: BigInt(Math.floor(parseFloat(amountUsdc) * 1e18)),
+        amount: BigInt(
+          Math.floor(parseFloat(amountUsdc) * 1e18)
+        ),
         memo,
         txHash: res.txHash,
         blockNumber: stats?.blockNumber || 0n,
@@ -117,27 +128,28 @@ export default function Home() {
         const existing = JSON.parse(
           localStorage.getItem("arc_tip_local_history") || "[]"
         );
+
         const updated = [newTip, ...existing].slice(0, 20);
+
         localStorage.setItem(
           "arc_tip_local_history",
-          JSON.stringify(updated, (k, v) =>
-            typeof v === "bigint" ? v.toString() : v
+          JSON.stringify(updated, (_, value) =>
+            typeof value === "bigint" ? value.toString() : value
           )
         );
       } catch {
-        // ignore
+        // Ignore local history errors.
       }
 
-      // Refresh feed
       loadNetworkData();
       refreshBalance();
     }
+
     return res;
   };
 
   return (
     <div className="min-h-screen bg-[#0B0E14] text-white flex flex-col font-sans selection:bg-[#00D2FF]/20 selection:text-[#00D2FF]">
-      {/* Global Navigation Header */}
       <Header
         account={account}
         balance={balance}
@@ -147,68 +159,71 @@ export default function Home() {
         onSwitchNetwork={() => setNetworkModalOpen(true)}
       />
 
-      {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8 sm:py-12 space-y-10">
-        {/* Hero Section */}
-        <div className="text-center max-w-3xl mx-auto space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#121722] border border-[#1E2638] text-xs font-mono text-[#00D2FF]">
+        {/* Hero */}
+        <section className="text-center max-w-3xl mx-auto space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#121722] border border-[#1E2638] text-xs font-semibold text-[#00D2FF]">
             <Zap className="w-3.5 h-3.5" />
-            <span>Circle Arc Layer 1 • Chain ID 5042</span>
+            <span>Small tips. Big love. 💸</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-            Native USDC Tipping & Payment Links
+            Send a Tip.
+            <br />
+            Get Paid.
+            <br />
+            Keep It Simple.
           </h1>
 
           <p className="text-sm sm:text-base text-[#94A3B8] max-w-2xl mx-auto leading-relaxed">
-            On Arc, the gas token <span className="text-white font-semibold">is USDC</span>.
-            Send non-custodial tips and micro-payments in 1 step with zero ERC-20
-            approvals, sub-second finality, and sub-cent fees.
+            Show love to your favorite creators, friends, and
+            people doing their thing. Send a tip or make your
+            own payment link in just a few taps.
           </p>
 
-          {/* Value Props Row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-left">
-            <div className="p-3.5 rounded-xl bg-[#121722]/80 border border-[#1E2638]">
-              <div className="flex items-center gap-2 mb-1">
+            <div className="p-4 rounded-xl bg-[#121722]/80 border border-[#1E2638]">
+              <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-[#00D2FF]" />
-                <span className="text-xs font-bold text-white uppercase font-mono">
-                  Zero Approvals
+                <span className="text-xs font-bold text-white uppercase">
+                  Easy to Send
                 </span>
               </div>
-              <p className="text-[11px] text-[#94A3B8]">
-                Native value transfer via msg.value. No approve() allowance tx needed.
+              <p className="text-xs text-[#94A3B8] leading-relaxed">
+                Send a little something to someone who deserves it.
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#121722]/80 border border-[#1E2638]">
-              <div className="flex items-center gap-2 mb-1">
+            <div className="p-4 rounded-xl bg-[#121722]/80 border border-[#1E2638]">
+              <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-xs font-bold text-white uppercase font-mono">
-                  18-Dec Native USDC
+                <span className="text-xs font-bold text-white uppercase">
+                  Your Own Link
                 </span>
               </div>
-              <p className="text-[11px] text-[#94A3B8]">
-                Gas and payment both settled in identical stable dollars.
+              <p className="text-xs text-[#94A3B8] leading-relaxed">
+                Make a link people can use to send you a tip.
+                Share it anywhere.
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#121722]/80 border border-[#1E2638]">
-              <div className="flex items-center gap-2 mb-1">
+            <div className="p-4 rounded-xl bg-[#121722]/80 border border-[#1E2638]">
+              <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-[#2775CA]" />
-                <span className="text-xs font-bold text-white uppercase font-mono">
-                  Sub-Second Speed
+                <span className="text-xs font-bold text-white uppercase">
+                  See the Love
                 </span>
               </div>
-              <p className="text-[11px] text-[#94A3B8]">
-                Instant transaction inclusion with on-chain immutable memos.
+              <p className="text-xs text-[#94A3B8] leading-relaxed">
+                Keep up with the latest tips and show some love
+                back.
               </p>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Primary Interactive Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Tipping & Link Creation */}
+        {/* Send tips and create links */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           <div className="lg:col-span-7 space-y-6">
             <TipCard
               senderAddress={account}
@@ -222,7 +237,6 @@ export default function Home() {
             />
           </div>
 
-          {/* Right Column: Live Feed & Arc Metrics */}
           <div className="lg:col-span-5 space-y-6">
             <ActivityFeed
               stats={stats}
@@ -232,73 +246,42 @@ export default function Home() {
               onRefresh={loadNetworkData}
             />
 
-            {/* Architecture Explanation Card */}
-            <div className="p-5 rounded-xl bg-[#121722] border border-[#1E2638] text-xs space-y-3">
-              <h4 className="font-bold text-white text-sm flex items-center gap-2">
-                <Shield className="w-4 h-4 text-[#00D2FF]" />
-                Why This Fits Arc Layer 1
-              </h4>
-              <p className="text-[#94A3B8] leading-relaxed">
-                Standard EVM tipping requires users to hold volatile gas tokens (ETH/MATIC)
-                plus stablecoins, paying high gas for approvals. On Arc,
-                1 balance does everything. ArcTip is built around that simplicity.
+            <div className="p-5 rounded-xl bg-[#121722] border border-[#1E2638] space-y-3">
+              <h2 className="font-bold text-white text-sm">
+                Made for Sharing 💙
+              </h2>
+
+              <p className="text-sm text-[#94A3B8] leading-relaxed">
+                Creators create. Friends show love. Everyone
+                deserves an easy way to give and receive a little
+                extra. MonYuny Tip makes it simple to send a tip
+                or share a link to get one.
               </p>
-              <div className="flex items-center justify-between pt-2 border-t border-[#1E2638] text-[11px] font-mono">
-                <span className="text-[#64748B]">Built for Arc Microgrants</span>
-                <a
-                  href="https://explorer.arc.io"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#00D2FF] hover:underline flex items-center gap-1"
-                >
-                  <span>Arc Explorer</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
+
+              <p className="text-xs text-[#64748B] leading-relaxed">
+                Before sending, check the recipient and amount.
+                Payment availability, fees, and processing times
+                may depend on your account and payment method.
+              </p>
             </div>
           </div>
-        </div>
+        </section>
       </main>
 
-      {/* Footer */}
+      {/* Simple customer-facing footer */}
       <footer className="w-full border-t border-[#1E2638] bg-[#0B0E14] py-8 text-xs text-[#94A3B8]">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="font-bold text-white tracking-tight">ArcTip</span>
-            <span className="text-[#475569]">•</span>
-            <span>Circle Arc Layer 1 (5042)</span>
-          </div>
+        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span className="font-bold text-white tracking-tight text-sm">
+            MonYuny Tip 💸
+          </span>
 
-          <div className="flex items-center gap-4 font-mono text-[11px]">
-            <a
-              href="https://github.com/Gieez/arc-tip"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-white flex items-center gap-1 transition-colors"
-            >
-              <Code2 className="w-3.5 h-3.5" />
-              <span>GitHub Repo</span>
-            </a>
-            <a
-              href="https://explorer.arc.io/address/0xBD437E3378eae16a082580e26157575523Ba852f"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-white flex items-center gap-1 transition-colors"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Contract</span>
-            </a>
-            <button
-              onClick={() => setNetworkModalOpen(true)}
-              className="hover:text-[#00D2FF] transition-colors"
-            >
-              RPC Config
-            </button>
-          </div>
+          <span className="text-center">
+            A little love goes a long way.
+          </span>
         </div>
       </footer>
 
-      {/* Modals */}
+      {/* Existing payment configuration and QR modals */}
       <NetworkModal
         isOpen={networkModalOpen}
         onClose={() => setNetworkModalOpen(false)}
