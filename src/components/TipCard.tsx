@@ -136,11 +136,12 @@ export const TipCard: React.FC<TipCardProps> = ({
           text: "Your tip didn't go through. Check your balance and payment details, then try again.",
         });
       }
-    } catch (err: unknown) {
-      setStatusMessage({
-        type: "error",
-        text: "Something went wrong. Please try again.",
-      });
+    } catch {
+  setStatusMessage({
+    type: "error",
+    text: "Something went wrong. Please try again.",
+  });
+}
     } finally {
       setLoading(false);
     }
